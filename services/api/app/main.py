@@ -3,6 +3,7 @@ from sqlalchemy import inspect
 
 from app.core.db import Base, engine
 from app.routers import media, auth, teams, users, transcripts, clips, renditions, templates, posts, integrations, metrics
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Reelgen API", version="0.1.0")
 
@@ -10,6 +11,14 @@ app = FastAPI(title="Reelgen API", version="0.1.0")
 def create_tables():
     # simple pour MVP: crée les tables si elles n'existent pas
     Base.metadata.create_all(bind=engine)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health():
