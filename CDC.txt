@@ -1,0 +1,259 @@
+# SaaS Shorts IA - Workflows API & Cahier des charges (v1)
+
+## Objectif
+
+Construire une application SaaS permettant de transformer des vios longues en shorts (TikTok/YouTube/Instagram), avec pipeline IA (tection des moments forts, sous-titres, habillage), gestion multi-comptes, planification et publication via APIs officielles.
+
+---
+
+## 1) Personas & Cas d'usage
+
+* **Cateur solo** : veut uploader un podcast/zoom, rer 10-20 extraits, valider, planifier.
+* **Agencequipe** : veut connecter 10-50 comptes, traiter en batch, guer validation, suivre analytics.
+
+---
+
+## 2) Architecture Logique (high level)
+
+**Frontend (Next.js/React)**
+
+* UI d'upload,diteur de cut timeline, sous-titres WYSIWYG, gestion planning, analytics.
+
+**Backend API (FastAPI Python ou Node.js/NestJS)**
+
+* Services : Auth, Users/Teams, Media, Clips, Publish, Schedules, Analytics, Billing.
+
+**Workers (queue)**
+
+* Celery/RQ (Python) ou BullMQ (Node) pour jobs longs : transcription, tection, rendu, upload, publication.
+
+**Stockage**
+
+* Objets : S3/R2 pour vios/exports/thumbnails.
+* DB : PostgreSQL (users, tokens OAuth, dias, jobs, posts, triques).
+* Cache : Redis (sessions, queues, rate-limit, locks de publication).
+
+**Ingrations**
+
+* IA Speech-to-text : Whisper (open-source) ou service  (AssemblyAI, Deepgram).
+* LLM/NLP : scoring moments forts, titres, descriptions, hashtags.
+* Rendering : FFmpeg + librairie de templates (overlay, progress bar, waveforms).
+* Plateformes : TikTok Open API (approue), YouTube Data API v3, Instagram Graph API.
+
+---
+
+## 3) Workflows tails (quence)
+
+### 3.1 Ingestion & Pprocessing
+
+1. **Upload** (UI ou URL/Drive/Dropbox)  S3.
+2. ration **proxy** (mp4 H.264 1080p/720p) + **waveform**.
+3. Extraction **audio** (aac) pour STT.
+
+### 3.2 Transcription & Segmentation
+
+1. **Whisper**  texte + timecodes + langue.
+2. **Segmentation** :
+
+   * tection silences/coupes : FFmpeg `silencedetect` + PySceneDetect.
+   * coupage brut en "beats".
+3. **Scoring IA** : LLM sur transcript pour tecter hooks, punchlines, Q/R, call-to-action.
+4. **lection candidates** : 15-90s, diversi tmatique, anticollision timecodes.
+dition automatique
+
+1. **Sous-titres** : style dynamique (karao), auto-casing, emojis optionnels.
+2. **Reformattage** : 9:16, 1:1, 16:9 (user choisit), crop auto speaker (face/center detection basique optionnelle).
+3. **Habillage** : templates (bandeau titre, progress bar, b-roll banks libres de droits), logo, palette.
+4. **ration titres/descriptions/hashtags** via LLM (+ variables langue, persona, ton).
+
+### 3.4 Revue & Validation
+
+1. diteur fin : placer in/out, corriger sous-titres, changer template.
+3. Marquer **Approved**/**Needs edits**.
+
+### 3.5 Planification & Publication
+
+1. Connecter comptes via **OAuth** (TT/YouTube/IG)  stocker tokens chiffs.
+2. Pour chaque clip approu :
+
+   * Choisir plateformes, heure (timezone), politique repost.
+   * **Upload** natif (p-upload) + **schedule** si suppor, sinon job cron c SaaS ttrvrdUI liste des **candidates** (vignettes + preview <5s + texte). l'heure T.
+3. Sauvegarder postId, liens, statut (draft/published/failed), logs.
+
+### 3.6 Analytics & Boucle d'iration
+
+1. curer KPIs J+1/J+7 : vues, watch time, CTR, likes, comments. 2. Feedback au modpRt 2. nGk
+le : entraner scoring (learning-to-rank simple) pour mieux choisir futurs moments.
+
+---
+
+## 4) Scifications APIs internes (MVP)
+
+### Auth & Comptes
+
+* `POST /auth/signup` {email, pwd}
+* `POST /auth/login`
+* `POST /teams` cerquipe, rles (owner, editor, publisher)
+
+### dia & Clips
+
+* `POST /media` upload init  URL pre-signed S3
+* `POST /media/{id}/ingest` lance pipeline
+* `GET /media/{id}` tadones, statut
+* `GET /media/{id}/candidates` liste des clips
+* `PATCH /clips/{id}` edits (in/out, subtitle json, template)
+* `POST /clips/{id}/render` (rendition 9:16/1:1)
+
+### Publication
+
+* `POST /integrations/{platform}/oauth/start|callback`
+* `GET /integrations/accounts` (list tokens valides)
+* `POST /posts` {clipId, platforms\[], title, desc, tags, scheduleAt}
+* `GET /posts/{id}` statut/logs
+
+### Analytics
+
+* `GET /analytics/posts?platform=...&from=...&to=...`
+* `GET /analytics/summary`
+
+### Webhooks
+
+* `/webhooks/youtube`, `/webhooks/meta`, `/webhooks/tiktok` pour events (publish ok, quota, erreurs).
+
+---
+
+## 5) ModnmM rpr### 3.3 htSdDDnGrsldvrgtmmdd ld/ngrdd
+le de dones (simplif)
+
+```
+User(id, email, password_hash, plan, created_at)
+Team(id, name)
+TeamMember(id, team_id, user_id, role)
+IntegrationAccount(id, team_id, platform, account_name, token_encrypted, refresh_token_encrypted, expires_at)
+Media(id, team_id, s3_uri_original, duration_s, language, status, created_at)
+Transcript(id, media_id, words_json)
+ClipCandidate(id, media_id, t_start, t_end, score, title_suggested, desc_suggested, hashtags, status)
+ClipRendition(id, clip_id, aspect, s3_uri, subtitle_json, template_id, status)
+Post(id, clip_rendition_id, platform, scheduled_at, status, platform_post_id, logs_json)
+Metric(id, post_id, ts, views, likes, comments, watch_time_s, ctr)
+Job(id, type, payload_json, status, attempts, last_error)
+```
+
+---
+
+## 6) curi, Compliance & Fiabili
+
+* **OAuth** officiel par plateforme, **pas** de cation auto de comptes.
+* Chiffrement au repos (KMS) des tokens, rotation & refresh automatiques.
+* Rate-limit par utilisateur + backoff exponentiel, idempotency keys.
+* File d'attente durable (Redis/RabbitMQ), retry policy, DLQ.
+* Sanitisation inputs, analyse antivirus (ClamAV) sur upload.
+* Logs structus + tra (OpenTelemetry), dashboards (Grafana).
+
+---
+
+## 7) Quali vio & Rendu (guidelines)
+
+* Input recomman : 1080p, 25-60fps, H.264.
+* Sorties : 1080x1920 (9:16), 1080x1080 (1:1), 1920x1080 (16:9), bitrate cible 8-12 Mbps.
+* Safe zones texte (TikTok/IG UI) + marges.
+* LUTs optionnelles, normalisation loudness (-14 LUFS pour shorts), ducking musique.
+
+---
+
+## 8) Templates & Sous-titres (format)
+
+* **Subtitle JSON** (par mot) : `{ t0, t1, text, speaker? }`.
+* Styles : police, taille, stroke, fond, animations (per-word reveal).
+* **Templates** : JSON paratrable (couleurs, positions, assets, CTA).
+
+---
+
+## 9) Plan de livraison (MVP  v1)
+
+**MVP (4-6 semaines)**
+
+* Upload  Transcription (Whisper)  10 clips auto  sous-titres simples  export 9:16  publication YouTube Shorts (OAuth).
+
+**v0.9**
+diteur fine-tuning des in/out + styles sous-titres, titres IA, planification, analytics basiques.
+
+**v1.0**
+
+* Ingration TikTok & Instagram, templates avans, b-rolls, multi-tenantquipes, billing Stripe.
+
+---
+
+## 10) KPIs & Motisation
+
+* **KPIs produit** : TTM (temps 1n ct * mddtrrttSin
+re vio  1er short), % clips approus, temps moyen rendu,checs publication.
+* **KPIs business** : ARPA, churn, LTV/CAC, MRR.
+* **Pricing** :
+
+  * Starter 29?/mois (100 min/mois, 3 comptes)
+  * Pro 99?/mois (600 min, 15 comptes)
+  * Agency 299?/mois (3000 min, 50 comptes, white-label)
+
+---
+
+## 11) Risques & Mitigations
+
+* **Quota/limitations API** monitoring, file d'attente, replanifications. * **Copyright** rifier licence, 
+filtrer contenu tiers, bibliothv vd
+ques libres.
+* **Ban/Shadowban**  respect CGU, fquence post, mix de contenu original.
+* **Cor
+ts GPU**  batch STT, cache segments, quali adaptative.
+
+---
+
+## 12) Backlog priori (user stories)
+
+1. En tant qu'utilisateur, j'upload une vio et je rextraits propos avec sous-titres.
+2. En tant qu'utilisateur, je connecte mon compte YouTube et je publie un short.
+3. En tant quditeur, je modifie le texte des sous-titres et le point d'ente/sortie.
+4. En tant que manager, je planifie 30 posts multi-plateformes pour la semaine.
+5. En tant qu'analyste, je vois les performances des derniers 50 posts par plateforme.
+
+---
+
+## 13) Sc technique (exemples pratiques)
+
+**FFmpeg**
+
+* tection silence : `-af silencedetect=n=-40dB:d=0.4`
+* Crop 9:16 cent orateur : `crop=w=ih*9/16:h=ih:x=(iw-w)/2:y=0`
+
+**Prompt LLM (scoring moments forts)**
+
+* Ente : transcript + timecodes, objectif nergie, valeur, curiosi), longueur cible.
+* Sortie : liste JSON `{start, end, score, title}` + justification concise.
+
+**Rendu sous-titres**
+
+* ration ASS/JSON  brnGt(rrDpr'sdst
+lage via `subtitles=...:force_style=...` ou overlay bitmaps.
+
+---
+
+## 14) Checklist conformi plateformes
+
+* **TikTok** : app review, cagories, anti-spam, pas de cation auto de comptes. * **YouTube** : limites quotas, 
+upload sus, respect Community Guidelines. * **Instagram** : comptes pro requis, limites journalimrrtt
+res, statut dia `CONTAINER`  `PUBLISH`.
+
+---
+
+## 15) Roadmap ingrations futures
+
+* LinkedIn (vertical B2B), X (courts 2 min 20), Shorts thumbnails A/B, ration chapitres auto long-form.
+
+---
+
+## 16) Annexes
+
+* Scmas de statuts : `Media.status` (uploaded  processing  transcribed  candidates\_ready  rendered  published/failed).
+* Idempotency cs pour `/posts` (hash clip+platform+scheduledAt).
+* Stragie de tests : unitaires (FFmpeg wrappers), ingration (OAuth mocks), E2E (playwright sur UI).
+ttlhngtm

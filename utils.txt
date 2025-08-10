@@ -1,0 +1,1 @@
+$Env:PATH += ";$env:APPDATA\\Python\\Scripts"

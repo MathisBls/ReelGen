@@ -1,0 +1,58 @@
+# OS / Editeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Python général
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Environnements & build
+.venv/
+.venv*/
+.conda/
+.eggs/
+*.egg-info/
+dist/
+build/
+pip-wheel-metadata/
+
+# Poetry
+.poetry-cache/
+# Si tu utilises le cache dans le repo
+/.poetry-cache/
+
+# Tests / outils
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+*.log
+logs/
+
+# Node / Frontend
+node_modules/
+.pnp.cjs
+.pnp.loader.mjs
+.next/
+out/
+.turbo/
+.vercel/
+coverage/
+*.tsbuildinfo
+
+# Env secrets
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-data/

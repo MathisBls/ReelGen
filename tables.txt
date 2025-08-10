@@ -1,0 +1,106 @@
+Core (MVP – 12 tables)
+
+users — comptes
+
+id, email (uniq), password_hash, is_active, created_at
+
+
+
+teams — organisation (pour agences)
+
+id, name, created_at
+
+
+
+team_members — appartenance + rôle
+
+id, team_id, user_id, role(enum: owner, editor, publisher)
+
+
+
+user_settings — préférences par user
+
+user_id(pk/fk), locale, timezone, theme, onboarding_flags_json
+
+
+
+media — vidéos sources (déjà créé)
+
+id, team_id?, user_id?, key, filename, content_type, status, duration_s, created_at
+
+
+
+transcripts — STT + timecodes
+
+id, media_id, language, words_json, created_at
+
+
+
+clips — segments candidats approuvables
+
+id, media_id, t_start, t_end, score, title_suggested, desc_suggested, hashtags_json, status(enum: candidate|approved|rejected)
+
+
+
+clip_renditions — exports (9:16, 1:1…)
+
+id, clip_id, aspect(enum), s3_uri, subtitle_json, template_id?, status(enum: queued|rendering|ready|failed), created_at
+
+
+
+templates — styles de sous-titres/overlays
+
+id, team_id?, name, config_json, is_default
+
+
+
+integration_accounts — connexions plateformes (OAuth)
+
+id, team_id, platform(enum: youtube|tiktok|instagram), account_name, token_encrypted, refresh_token_encrypted, expires_at, scopes
+
+
+
+posts — publications & planning
+
+id, clip_rendition_id, platform, scheduled_at, status(enum: draft|scheduled|published|failed), platform_post_id, logs_json, created_at
+
+
+
+metrics — perfs des posts
+
+id, post_id, ts, views, likes, comments, watch_time_s, ctr
+
+
+
+
+
+
+Avancé (v1 – 8 tables)
+favorites — favoris par user
+
+id, user_id, clip_id (ou clip_rendition_id), created_at
+
+tags & 15) media_tags — tagging libre
+
+
+
+tags(id, team_id, name) ; media_tags(media_id, tag_id)
+
+collections & 17) collection_items — projets/campagnes
+
+collections(id, team_id, name, type) ; collection_items(collection_id, kind(enum: media|clip|rendition|post), ref_id, position)
+
+webhooks_in — évènements entrants (Meta, YouTube, TikTok)
+
+id, platform, event_type, payload_json, signature, received_at, processed_at, status
+
+jobs — journal des jobs worker (en plus de RQ)
+
+id, type, payload_json, status, attempts, last_error, created_at, updated_at
+
+billing (min) — si Stripe
+
+billing_customers(id, team_id, stripe_customer_id)
+
+subscriptions(id, team_id, plan, status, current_period_end, stripe_sub_id)
+(tu peux aussi ne garder que les IDs Stripe côté DB)
